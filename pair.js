@@ -89,7 +89,7 @@ router.get('/', async (req, res) => {
                         // Session ID එක OWNER_NUMBER එකට යැවීම
                         if (ownerJid) {
                             await DanuwaPairWeb.sendMessage(ownerJid, {
-                                text: `⭐ Session ID එක සාර්ථකව Generate වී MEGA වෙත Upload විය. String Session එක:\n\n*${sid}*\n\nMEGA Link: ${mega_url}`
+                                text: `⭐ Session ID එක සාර්ථකව Generate වී MEGA වෙත Upload විය. String Session එක:\n\n**Zanta-MD Session id👇*${sid}*\n\nMEGA Link: ${mega_url}`
                             });
                             console.log(`✅ Confirmation message sent to Owner Number: ${OWNER_NUMBER}`);
                         } else {
