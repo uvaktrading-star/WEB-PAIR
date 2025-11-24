@@ -12,3 +12,14 @@
 `https://github.com/Akashkavindu/WEB-PAIR`
 
 [![Run on Replit](https://replit.com/badge/github/Akashkavindu/WEB-PAIR)](https://replit.com/github/Akashkavindu/WEB-PAIR)
+
+
+---
+
+### 🚀 Session ID ලබා ගත්තාද? දැන් ප්‍රධාන Bot එක Deploy කරන්න!
+
+ඔබට Session ID එක සාර්ථකව ලැබුණා නම්, Bot එකේ සියලු Features සමඟ Deploy කිරීමට පහත Button එක ක්ලික් කරන්න.
+
+[![Deploy ZANTA-MD Bot](https://img.shields.io/badge/Deploy%20Bot%20Code-ZANTA--MD-blueviolet?style=for-the-badge&logo=github)](https://github.com/Akashkavindu/ZANTA_MD)
+
+---
