@@ -1,7 +1,8 @@
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
 const { exec } = require("child_process");
-let router = express.Router()
+let router = express.Router();
 const pino = require("pino");
 const {
     default: makeWASocket,
@@ -13,6 +14,7 @@ const {
 } = require("@whiskeysockets/baileys");
 const { upload } = require('./mega');
 
+// තාවකාලික Folder එක මකාදැමීම
 function removeFile(FilePath) {
     if (!fs.existsSync(FilePath)) return false;
     fs.rmSync(FilePath, { recursive: true, force: true });
@@ -20,8 +22,18 @@ function removeFile(FilePath) {
 
 router.get('/', async (req, res) => {
     let num = req.query.number;
+    if (!num) return res.send({ error: "Number is required" });
+
+    // සෑම User කෙනෙකුටම අද්විතීය (Unique) Folder එකක් සෑදීම
+    const uniqueSessionDir = path.join(__dirname, `../temp_session_${Date.now()}`);
+    
     async function DanuwaPair() {
-        const { state, saveCreds } = await useMultiFileAuthState(`./session`);
+        if (!fs.existsSync(uniqueSessionDir)) {
+            fs.mkdirSync(uniqueSessionDir, { recursive: true });
+        }
+
+        const { state, saveCreds } = await useMultiFileAuthState(uniqueSessionDir);
+
         try {
             let DanuwaPairWeb = makeWASocket({
                 auth: {
@@ -30,11 +42,12 @@ router.get('/', async (req, res) => {
                 },
                 printQRInTerminal: false,
                 logger: pino({ level: "fatal" }).child({ level: "fatal" }),
-                browser: Browsers.macOS("Safari"),
+                // වඩාත් ස්ථායී Browser එකක් භාවිතා කිරීම
+                browser: Browsers.macOS("Chrome"), 
             });
 
             if (!DanuwaPairWeb.authState.creds.registered) {
-                await delay(1500);
+                await delay(3000); // Delay එක වැඩි කළා pairing request එක හරියට යන්න
                 num = num.replace(/[^0-9]/g, '');
                 const code = await DanuwaPairWeb.requestPairingCode(num);
                 if (!res.headersSent) {
@@ -43,65 +56,61 @@ router.get('/', async (req, res) => {
             }
 
             DanuwaPairWeb.ev.on('creds.update', saveCreds);
+
             DanuwaPairWeb.ev.on("connection.update", async (s) => {
                 const { connection, lastDisconnect } = s;
+
                 if (connection === "open") {
                     try {
-                        await delay(10000);
-                        const sessionDanuwa = fs.readFileSync('./session/creds.json');
+                        await delay(5000); // Creds සේව් වෙන්න කාලය ලබාදීම
+                        const credsPath = path.join(uniqueSessionDir, 'creds.json');
+                        
+                        if (fs.existsSync(credsPath)) {
+                            // Mega එකට Upload කිරීම
+                            function randomMegaId(length = 6) {
+                                return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
+                            }
 
-                        const auth_path = './session/';
-                        const user_jid = jidNormalizedUser(DanuwaPairWeb.user.id);
-
-                      function randomMegaId(length = 6, numberLength = 4) {
-                      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-                      let result = '';
-                      for (let i = 0; i < length; i++) {
-                      result += characters.charAt(Math.floor(Math.random() * characters.length));
+                            const mega_url = await upload(fs.createReadStream(credsPath), `ZANTA_${randomMegaId()}.json`);
+                            const string_session = mega_url.replace('https://mega.nz/file/', '');
+                            
+                            const user_jid = jidNormalizedUser(DanuwaPairWeb.user.id);
+                            await DanuwaPairWeb.sendMessage(user_jid, { text: string_session });
+                            
+                            console.log(`Session generated for: ${num}`);
                         }
-                       const number = Math.floor(Math.random() * Math.pow(10, numberLength));
-                        return `${result}${number}`;
-                        }
-
-                        const mega_url = await upload(fs.createReadStream(auth_path + 'creds.json'), `${randomMegaId()}.json`);
-
-                        const string_session = mega_url.replace('https://mega.nz/file/', '');
-
-                        const sid = string_session;
-
-                        const dt = await DanuwaPairWeb.sendMessage(user_jid, {
-                            text: sid
-                        });
-
                     } catch (e) {
-                        exec('pm2 restart danuwa');
+                        console.error("Upload Error:", e);
                     }
 
-                    await delay(100);
-                    return await removeFile('./session');
-                    process.exit(0);
-                } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
-                    await delay(10000);
-                    DanuwaPair();
+                    await delay(2000);
+                    removeFile(uniqueSessionDir);
+                    // මෙතන process.exit දාන්න එපා, එතකොට Render එකම Off වෙනවා. 
+                    // ඒ වෙනුවට connection එක close කරන්න.
+                    DanuwaPairWeb.logout(); 
+                    DanuwaPairWeb.end();
+                } 
+                
+                if (connection === "close") {
+                    let reason = lastDisconnect?.error?.output?.statusCode;
+                    if (reason !== 401) {
+                        // අවශ්‍ය නම් නැවත උත්සාහ කරන්න
+                    } else {
+                        removeFile(uniqueSessionDir);
+                    }
                 }
             });
+
         } catch (err) {
-            exec('pm2 restart danuwa-md');
-            console.log("service restarted");
-            DanuwaPair();
-            await removeFile('./session');
+            console.error("Critical Error:", err);
+            removeFile(uniqueSessionDir);
             if (!res.headersSent) {
-                await res.send({ code: "Service Unavailable" });
+                res.send({ code: "Service Unavailable" });
             }
         }
     }
-    return await DanuwaPair();
-});
 
-process.on('uncaughtException', function (err) {
-    console.log('Caught exception: ' + err);
-    exec('pm2 restart danuwa');
+    DanuwaPair();
 });
-
 
 module.exports = router;
