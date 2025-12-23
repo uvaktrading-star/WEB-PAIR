@@ -1,27 +1,38 @@
 const express = require('express');
 const app = express();
-const path = require('path'); // Path module එක භාවිතා කිරීම වඩාත් නිවැරදියි
+const path = require('path');
 const bodyParser = require("body-parser");
-const PORT = process.env.PORT || 8000;
-let codeRouter = require('./pair'); // pair.js route file එක
-require('events').EventEmitter.defaultMaxListeners = 500;
 
-// 1. **BODY PARSER** මුලින්ම භාවිතා කරන්න
+// Port එක Render එකෙන් දෙන එක ගන්නවා, නැත්නම් 8000 ගන්නවා
+const PORT = process.env.PORT || 8000;
+
+// 1. Middleware සැකසුම්
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// 2. '/code' route එකට pair.js router එක යොදන්න (Session Logic)
-// ⚠️ ඔබගේ pair.html form එකේ action="/code" විය යුතුය.
-app.use('/code', codeRouter); 
+// static files (css, js, images) තිබේ නම් ඒවා පෙන්වීමට
+app.use(express.static(path.join(__dirname, 'public')));
 
-// 3. Root route එකෙන් pair.html (Form එක) Serve කරන්න
-app.use('/', async (req, res, next) => {
-    // __path වෙනුවට path.join භාවිතා කිරීම ආරක්ෂිතයි
-    res.sendFile(path.join(process.cwd(), 'pair.html')) 
+// 2. Pair.js Router එක ලින්ක් කිරීම
+// ⚠️ මතක ඇතුව ඔයාගේ pair.html එකේ form action එක "/code" විය යුතුයි.
+let codeRouter = require('./pair'); 
+app.use('/code', codeRouter);
+
+// 3. Root Route - මුලින්ම පෙන්වන පිටුව (pair.html)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pair.html'));
 });
 
+// 4. සර්වර් එක ආරම්භ කිරීම
 app.listen(PORT, () => {
-    console.log(`⏩ Server running on http://localhost:${PORT}`)
-})
+    console.log(`
+🚀 ZANTA-MD Web Pair Is Running!
+🌐 URL: http://localhost:${PORT}
+📅 Date: ${new Date().toLocaleString()}
+    `);
+});
+
+// EventEmitter සීමාව වැඩි කිරීම (Baileys සඳහා වැදගත්)
+require('events').EventEmitter.defaultMaxListeners = 500;
 
 module.exports = app;
